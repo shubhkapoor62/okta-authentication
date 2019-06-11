@@ -1,0 +1,94 @@
+Page 1
+
+  Install  rxjs-compat
+
+  npm install angular-oauth2-oidc@3.1.4 rxjs-compat@6.1.0
+
+  Modify src/app/app.component.ts to import OAuthService
+  configure app to use your Okta application’s settings.
+
+
+  import { OAuthService, JwksValidationHandler } from 'angular-oauth2-oidc';
+
+  ...
+
+    constructor(private oauthService: OAuthService) {
+      this.oauthService.redirectUri = window.location.origin;
+      this.oauthService.clientId = '{clientId}';
+      this.oauthService.scope = 'openid profile email';
+      this.oauthService.issuer = 'https://{yourOktaDomain}/oauth2/default';
+      this.oauthService.tokenValidationHandler = new JwksValidationHandler();
+
+      // Load Discovery Document and then try to login the user
+      this.oauthService.loadDiscoveryDocumentAndTryLogin();
+    }
+
+Page -2 
+
+  Create src/app/home/home.component.ts and configure it to have Login and Logout buttons.
+  OR 
+  Alternatively have an internal trigger on home page of an application to call out login method
+  
+  import { Component } from '@angular/core';
+  import { OAuthService } from 'angular-oauth2-oidc';
+
+  @Component({
+    template: `... Template with login log out triggers`
+  })
+  export class HomeComponent {
+
+    constructor(private oauthService: OAuthService) {
+    }
+
+    login() {
+      this.oauthService.initImplicitFlow();
+    }
+
+    logout() {
+      this.oauthService.logOut();
+    }
+  }
+ 
+ Page 3 -
+ 
+ Create auth.guard.service.ts which will intercept router before navigation
+This will help to navigate to the HomeComponent 
+if the user is not authenticated.
+
+import { Injectable } from '@angular/core';
+import { ActivatedRouteSnapshot, CanActivate, Router, RouterStateSnapshot } from '@angular/router';
+import { OAuthService } from 'angular-oauth2-oidc';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+
+  constructor(private oauthService: OAuthService, private router: Router) {}
+
+  canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean {
+    if (this.oauthService.hasValidIdToken()) {
+      return true;
+    }
+    this.router.navigate(['/home']);
+    return false;
+  }
+}
+
+
+Import the OAuthModule in src/app/app.module.ts, configure and lock the routes down with the AuthGuard.
+
+import { OAuthModule } from 'angular-oauth2-oidc';
+import { HomeComponent } from './home/home.component';
+import { AuthGuard } from './shared';
+
+const appRoutes: Routes = [
+  { path: 'search', component: SearchComponent, canActivate: [AuthGuard] },
+  { path: 'edit/:id', component: EditComponent, canActivate: [AuthGuard] },
+  { path: 'home', component: HomeComponent },
+  { path: '', redirectTo: 'home', pathMatch: 'full' },
+  { path: '**', redirectTo: 'home' }
+];
+
+ 
+
